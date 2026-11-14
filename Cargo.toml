@@ -2,7 +2,7 @@
 name = "rustrequest"
 version = "0.1.0"
 edition = "2024"
-description = "A fast Rust web scraper & crawler with an animated terminal UI, proxy support, and JavaScript detection/removal"
+description = "A fast Rust web scraper & crawler with a graphical and terminal UI, proxy support, and JavaScript detection/removal"
 license = "MIT"
 keywords = ["scraper", "crawler", "tui", "cli", "web"]
 categories = ["command-line-utilities", "web-programming"]
