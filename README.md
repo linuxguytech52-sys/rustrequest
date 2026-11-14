@@ -9,7 +9,7 @@ A fast web scraper and crawler written in Rust, with a graphical desktop UI, an 
 - Concurrent fetching with configurable workers, depth, page limits, and URL exclusions
 - JavaScript analysis: inline and external scripts, event handlers, `javascript:` URLs, `<noscript>`, and framework hints (React, Next.js, Vue)
 - Optional JavaScript removal from saved HTML and extracted text
-- `robots.txt` support, including wildcard rules and `Crawl-delay`
+- `robots.txt` support, including wildcard rules and `Crawl-delay` (enabled by default)
 - HTTP/HTTPS/SOCKS5 proxy support, custom headers, cookies, retries with backoff, and timeouts
 - Metadata extraction: title, description, language, canonical URL, headings, links, and readable text
 - Output as JSON, JSON Lines, CSV, sitemap XML, or plain text
@@ -46,8 +46,11 @@ rustrequest https://example.com -d 2 -m 100 -p socks5://127.0.0.1:1080
 # Scrape a fixed list of URLs without following links
 rustrequest https://example.com https://example.com/about --fetch
 
-# Force the terminal UI, respect robots.txt, and write a sitemap
-rustrequest https://example.com --tui --respect-robots -f sitemap -o sitemap.xml
+# Force the terminal UI and write a sitemap
+rustrequest https://example.com --tui -f sitemap -o sitemap.xml
+
+# Crawl a site while deliberately ignoring robots.txt
+rustrequest https://example.com --ignore-robots
 
 # Headless JSONL output with extra diagnostics
 rustrequest https://example.com --no-tui -f jsonl -v
@@ -82,13 +85,14 @@ In the GUI, `Ctrl+Enter` starts or stops the current scrape or crawl.
 | `-c, --concurrency <N>` | Number of concurrent requests |
 | `--any-domain` | Allow crawling across different domains |
 | `--include-subdomains` | Include subdomains of the seed host |
-| `-p, --proxy <URL>` | Proxy URL (`http`, `https`, or `socks5`) |
+| `-p, --proxy <URL>` | Proxy URL (`http`, `https`, or `socks5`); credentials may be embedded (`http://user:pass@host:port`) |
 | `--timeout <SECONDS>` | Per-request timeout |
 | `--delay <MS>` | Politeness delay between requests |
 | `--retries <N>` | Retries for failed or `429`/`5xx` responses |
 | `-A, --user-agent <UA>` | User-Agent string (defaults to this repository URL) |
 | `-H, --header "Name: value"` | Extra request header, repeatable |
-| `--respect-robots` | Honor `robots.txt` rules and crawl delays |
+| `--respect-robots` | Honor `robots.txt` rules and crawl delays (this is the default) |
+| `--ignore-robots` | Ignore `robots.txt` rules and crawl delays |
 | `--keep-js` | Keep JavaScript when saving HTML or extracting text |
 | `--no-text` | Do not extract readable page text |
 | `--insecure` | Accept invalid TLS certificates |
@@ -101,6 +105,21 @@ In the GUI, `Ctrl+Enter` starts or stops the current scrape or crawl.
 | `-v, --verbose` | Print extra diagnostics |
 
 Run `rustrequest --help` for the full list.
+
+## Proxy authentication
+
+Authenticated proxies are supported by embedding the username and password in the proxy URL:
+
+```bash
+rustrequest https://example.com -p http://user:secret@127.0.0.1:8080
+rustrequest https://example.com -p socks5://user:secret@127.0.0.1:1080
+```
+
+Credentials are sent using the proxy's Basic authentication mechanism. If the username or password contains reserved characters such as `@`, `:`, `/`, or `#`, percent-encode them (for example, `p@ss` becomes `p%40ss`).
+
+## robots.txt
+
+`robots.txt` is respected by default, including `Allow`/`Disallow` wildcard rules and `Crawl-delay`. Use `--ignore-robots` (or uncheck "Respect robots.txt" in the GUI) to disable this behavior.
 
 ## Output
 

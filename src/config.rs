@@ -113,7 +113,7 @@ impl Config {
             retries: cli.retries,
             user_agent: cli.user_agent,
             headers,
-            respect_robots: cli.respect_robots,
+            respect_robots: !cli.ignore_robots,
             remove_js: !cli.keep_js,
             extract_text: !cli.no_text,
             insecure: cli.insecure,

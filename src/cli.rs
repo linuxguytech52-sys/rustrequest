@@ -82,9 +82,13 @@ pub struct Cli {
     #[arg(short = 'H', long = "header", value_name = "NAME: VALUE")]
     pub headers: Vec<String>,
 
-    /// Respect robots.txt rules
-    #[arg(long)]
+    /// Respect robots.txt rules (enabled by default)
+    #[arg(long, conflicts_with = "ignore_robots")]
     pub respect_robots: bool,
+
+    /// Ignore robots.txt rules
+    #[arg(long, conflicts_with = "respect_robots")]
+    pub ignore_robots: bool,
 
     /// Keep JavaScript instead of stripping it from saved/extracted HTML
     #[arg(long)]

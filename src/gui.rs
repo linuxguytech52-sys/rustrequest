@@ -812,7 +812,7 @@ impl RustRequestApp {
                             "rustrequest/0.1 (+https://github.com/linuxguytech52-sys/rustrequest)"
                                 .to_string(),
                         headers: vec![],
-                        respect_robots: false,
+                        respect_robots: true,
                         remove_js: true,
                         extract_text: true,
                         insecure: false,
@@ -893,7 +893,7 @@ impl RustRequestApp {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.form.proxy)
                             .desired_width(f32::INFINITY)
-                            .hint_text("http://127.0.0.1:8080  ·  socks5://127.0.0.1:1080"),
+                            .hint_text("http://user:pass@127.0.0.1:8080  ·  socks5://user:pass@127.0.0.1:1080"),
                     );
                     ui.add_space(4.0);
                     drag_u64(ui, "Timeout (s)", &mut self.form.timeout, 1..=300, "");
@@ -922,6 +922,13 @@ impl RustRequestApp {
                     ui.checkbox(
                         &mut self.form.respect_robots,
                         RichText::new("Respect robots.txt").size(13.0),
+                    );
+                    ui.label(
+                        RichText::new(
+                            "Follows robots.txt rules and crawl delays. On by default; uncheck to ignore.",
+                        )
+                        .size(10.5)
+                        .color(Color32::from_rgb(112, 123, 146)),
                     );
                     ui.checkbox(
                         &mut self.form.remove_js,
