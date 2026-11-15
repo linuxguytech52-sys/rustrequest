@@ -32,6 +32,7 @@ impl StripOptions {
         }
     }
 
+    #[cfg(test)]
     pub fn for_html() -> Self {
         StripOptions {
             scripts: true,

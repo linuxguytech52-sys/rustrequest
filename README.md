@@ -8,12 +8,12 @@ A fast web scraper and crawler written in Rust, with a graphical desktop UI, an 
 - Two GUI tabs: **Scrape** (fetch each URL once) and **Crawl** (follow links in BFS order)
 - Concurrent fetching with configurable workers, depth, page limits, and URL exclusions
 - JavaScript analysis: inline and external scripts, event handlers, `javascript:` URLs, `<noscript>`, and framework hints (React, Next.js, Vue)
-- Optional JavaScript removal from saved HTML and extracted text
+- Optional JavaScript removal from extracted text
 - `robots.txt` support, including wildcard rules and `Crawl-delay` (enabled by default)
 - HTTP/HTTPS/SOCKS5 proxy support, custom headers, cookies, retries with backoff, and timeouts
 - Metadata extraction: title, description, language, canonical URL, headings, links, and readable text
 - Output as JSON, JSON Lines, CSV, sitemap XML, or plain text
-- Optional HTML snapshots, live progress metrics, and graceful cancellation
+- Output-directory picker in the GUI, live progress metrics, and graceful cancellation
 
 ## Installation
 
@@ -93,12 +93,11 @@ In the GUI, `Ctrl+Enter` starts or stops the current scrape or crawl.
 | `-H, --header "Name: value"` | Extra request header, repeatable |
 | `--respect-robots` | Honor `robots.txt` rules and crawl delays (this is the default) |
 | `--ignore-robots` | Ignore `robots.txt` rules and crawl delays |
-| `--keep-js` | Keep JavaScript when saving HTML or extracting text |
+| `--keep-js` | Keep script and style content when extracting readable text |
 | `--no-text` | Do not extract readable page text |
 | `--insecure` | Accept invalid TLS certificates |
 | `-f, --format <FORMAT>` | `json`, `jsonl`, `csv`, `sitemap`, or `text` |
-| `-o, --output <PATH>` | Output path (defaults to `rustrequest-output.<ext>`) |
-| `--save-html <DIR>` | Save fetched HTML into a directory |
+| `-o, --output <PATH>` | Output file path (defaults to `rustrequest-output.<ext>`) |
 | `--fetch` | Fetch seed URLs only; do not follow links |
 | `--max-links <N>` | Limit extracted links per page |
 | `--exclude <SUBSTRING>` | Skip URLs containing a substring, repeatable |
@@ -167,21 +166,19 @@ JSON page objects include:
 
 The `text` field is omitted when text extraction is disabled or no text is available.
 
-### HTML snapshots
+### Choosing the output location
 
-`--save-html <DIR>` (or "Save HTML snapshots to directory" in the GUI) expects a **directory** and saves one `.html` file per fetched page into it. This happens **in addition to** the normal data export, which is still written to the `--output` path (default `rustrequest-output.<ext>` in the current directory). HTML snapshots are never written to the output file, and the output file is never written into the HTML directory unless you explicitly point both settings at the same path.
+In the GUI, set **Output directory** to the folder where results should be written, or click **Browse…** to pick it. The file name is derived from the selected format (`rustrequest-output.json`, `.csv`, `.xml`, and so on). Leave the directory empty to write into the current working directory.
+
+On the command line, `-o, --output` takes the full file path:
 
 ```bash
-# Data export: rustrequest-output.json
-# HTML snapshots: ./snapshots/*.html
-rustrequest https://example.com -f json --save-html ./snapshots
+rustrequest https://example.com -f csv -o ./reports/site.csv
 ```
-
-If you open the HTML directory and see only `.html` files, look for the data export at the `Output file` path shown in the GUI, or at the `results →` path printed in headless mode.
 
 ## JavaScript handling
 
-Pages are always analyzed for JavaScript usage. By default, scripts, inline event handlers, `javascript:` URLs, and related markup are removed from saved HTML and extracted text. Use `--keep-js` to preserve them.
+Pages are always analyzed for JavaScript usage. By default, script and style content, inline event handlers, and `javascript:` URLs are removed from extracted text. Use `--keep-js` to keep script and style content in the extracted text.
 
 ## Project layout
 

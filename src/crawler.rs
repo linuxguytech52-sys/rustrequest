@@ -1,6 +1,4 @@
 use std::collections::{HashSet, VecDeque};
-use std::hash::{Hash, Hasher};
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -83,20 +81,6 @@ fn host_allowed(url: &Url, hosts: &[String], include_subdomains: bool) -> bool {
     hosts
         .iter()
         .any(|seed| host == *seed || (include_subdomains && host.ends_with(&format!(".{seed}"))))
-}
-
-fn html_filename(url: &str) -> String {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    url.hash(&mut hasher);
-    format!("{:016x}.html", hasher.finish())
-}
-
-fn save_html(dir: &Path, url: &str, html: &str) {
-    if std::fs::create_dir_all(dir).is_err() {
-        return;
-    }
-    let path = dir.join(html_filename(url));
-    let _ = std::fs::write(path, html);
 }
 
 pub async fn crawl(cfg: Config, client: Client, tx: UnboundedSender<CrawlEvent>) -> CrawlResult {
@@ -197,29 +181,23 @@ pub async fn crawl_with_cancel(
             queued = queued.saturating_sub(1);
             match outcome {
                 Outcome::Ok(fetch) => {
-                    let extracted = extract::analyze(
+                    let page = extract::analyze(
                         url.as_str(),
                         &fetch,
                         depth,
                         extract::ExtractOptions {
                             remove_js: cfg.remove_js,
                             want_text: cfg.extract_text,
-                            store_html: cfg.save_html.is_some(),
                             max_links: cfg.max_links,
                             exclude: &cfg.exclude,
                         },
                     );
-
-                    if let (Some(dir), Some(html)) = (&cfg.save_html, &extracted.stored_html) {
-                        save_html(dir, &extracted.page.final_url, html);
-                    }
 
                     pages_done += 1;
                     if fetch.status >= 400 {
                         failed += 1;
                     }
 
-                    let page = extracted.page;
                     if depth < cfg.max_depth {
                         for link in &page.links {
                             let Ok(link_url) = Url::parse(link) else {

@@ -28,15 +28,9 @@ pub struct PageData {
     pub js: JsReport,
 }
 
-pub struct Extracted {
-    pub page: PageData,
-    pub stored_html: Option<String>,
-}
-
 pub struct ExtractOptions<'a> {
     pub remove_js: bool,
     pub want_text: bool,
-    pub store_html: bool,
     pub max_links: Option<usize>,
     pub exclude: &'a [String],
 }
@@ -163,11 +157,10 @@ pub fn analyze(
     fetch: &FetchResult,
     depth: usize,
     opts: ExtractOptions<'_>,
-) -> Extracted {
+) -> PageData {
     let ExtractOptions {
         remove_js,
         want_text,
-        store_html,
         max_links,
         exclude,
     } = opts;
@@ -183,29 +176,22 @@ pub fn analyze(
         } else {
             None
         };
-        return Extracted {
-            page: PageData {
-                url: requested_url.to_string(),
-                final_url: fetch.final_url.clone(),
-                status: fetch.status,
-                content_type,
-                depth,
-                elapsed_ms: fetch.elapsed.as_millis() as u64,
-                size: fetch.size as u64,
-                title: None,
-                description: None,
-                lang: None,
-                canonical: None,
-                headings: Vec::new(),
-                links: Vec::new(),
-                text,
-                js: JsReport::default(),
-            },
-            stored_html: if store_html {
-                Some(fetch.body.clone())
-            } else {
-                None
-            },
+        return PageData {
+            url: requested_url.to_string(),
+            final_url: fetch.final_url.clone(),
+            status: fetch.status,
+            content_type,
+            depth,
+            elapsed_ms: fetch.elapsed.as_millis() as u64,
+            size: fetch.size as u64,
+            title: None,
+            description: None,
+            lang: None,
+            canonical: None,
+            headings: Vec::new(),
+            links: Vec::new(),
+            text,
+            js: JsReport::default(),
         };
     }
 
@@ -239,41 +225,32 @@ pub fn analyze(
 
     let links = extract_links(&doc, &base, max_links, exclude);
 
-    let stored_html = if store_html {
+    let text = if want_text {
         if remove_js {
-            Some(js::strip(doc.clone(), StripOptions::for_html()))
+            let for_text = js::strip(doc.clone(), StripOptions::for_text());
+            Some(extract_text(&for_text))
         } else {
-            Some(doc.html())
+            Some(extract_text(&doc.html()))
         }
     } else {
         None
     };
 
-    let text = if want_text {
-        let for_text = js::strip(doc.clone(), StripOptions::for_text());
-        Some(extract_text(&for_text))
-    } else {
-        None
-    };
-
-    Extracted {
-        page: PageData {
-            url: requested_url.to_string(),
-            final_url: fetch.final_url.clone(),
-            status: fetch.status,
-            content_type,
-            depth,
-            elapsed_ms: fetch.elapsed.as_millis() as u64,
-            size: fetch.size as u64,
-            title,
-            description,
-            lang,
-            canonical,
-            headings,
-            links,
-            text,
-            js: js_report,
-        },
-        stored_html,
+    PageData {
+        url: requested_url.to_string(),
+        final_url: fetch.final_url.clone(),
+        status: fetch.status,
+        content_type,
+        depth,
+        elapsed_ms: fetch.elapsed.as_millis() as u64,
+        size: fetch.size as u64,
+        title,
+        description,
+        lang,
+        canonical,
+        headings,
+        links,
+        text,
+        js: js_report,
     }
 }

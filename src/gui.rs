@@ -104,8 +104,7 @@ struct Form {
     include_subdomains: bool,
     max_links: usize,
     format: OutputFormat,
-    output: String,
-    save_html: String,
+    output_dir: String,
 }
 
 impl Form {
@@ -140,14 +139,11 @@ impl Form {
             include_subdomains: cfg.include_subdomains,
             max_links: cfg.max_links.unwrap_or(0),
             format: cfg.format,
-            output: cfg
+            output_dir: cfg
                 .output
                 .as_ref()
-                .map(|p| p.display().to_string())
-                .unwrap_or_default(),
-            save_html: cfg
-                .save_html
-                .as_ref()
+                .and_then(|p| p.parent())
+                .filter(|p| !p.as_os_str().is_empty())
                 .map(|p| p.display().to_string())
                 .unwrap_or_default(),
         }
@@ -243,31 +239,22 @@ impl RustRequestApp {
             .filter(|s| !s.is_empty())
             .collect();
 
-        let output = non_empty(&self.form.output).map(PathBuf::from);
-        let save_html = non_empty(&self.form.save_html).map(PathBuf::from);
-
-        if let Some(path) = &output
-            && path.is_dir()
+        let output_dir = non_empty(&self.form.output_dir).map(PathBuf::from);
+        if let Some(dir) = &output_dir
+            && dir.exists()
+            && !dir.is_dir()
         {
             anyhow::bail!(
-                "output file '{}' is a directory; enter a file path instead (default: rustrequest-output.{})",
-                path.display(),
-                self.form.format.extension()
+                "output directory '{}' is a file; choose a directory instead",
+                dir.display()
             );
         }
-        if let Some(path) = &save_html {
-            if path.exists() && !path.is_dir() {
-                anyhow::bail!(
-                    "save-HTML path '{}' is a file; enter a directory instead",
-                    path.display()
-                );
-            }
-            if let Some(output) = &output
-                && output == path
-            {
-                anyhow::bail!("output file and save-HTML directory must be different paths");
-            }
-        }
+        let output = output_dir.map(|dir| {
+            dir.join(format!(
+                "rustrequest-output.{}",
+                self.form.format.extension()
+            ))
+        });
 
         let fetch_only = self.tab == Tab::Scrape;
         let max_depth = if fetch_only { 0 } else { self.form.depth };
@@ -297,7 +284,6 @@ impl RustRequestApp {
             fetch_only,
             format: self.form.format,
             output,
-            save_html,
             verbose: false,
             max_links: if self.form.max_links == 0 {
                 None
@@ -333,8 +319,14 @@ impl RustRequestApp {
     }
 
     fn output_preview(&self) -> String {
-        non_empty(&self.form.output)
-            .unwrap_or_else(|| format!("rustrequest-output.{}", self.form.format.extension()))
+        let dir = non_empty(&self.form.output_dir).unwrap_or_else(|| ".".to_string());
+        PathBuf::from(dir)
+            .join(format!(
+                "rustrequest-output.{}",
+                self.form.format.extension()
+            ))
+            .display()
+            .to_string()
     }
 
     fn planned_pages(&self) -> usize {
@@ -847,7 +839,6 @@ impl RustRequestApp {
                         fetch_only: false,
                         format: OutputFormat::Json,
                         output: None,
-                        save_html: None,
                         verbose: false,
                         max_links: None,
                         exclude: vec![],
@@ -964,7 +955,7 @@ impl RustRequestApp {
                     );
                     ui.label(
                         RichText::new(
-                            "Strips scripts, inline handlers and javascript: URLs from saved HTML and text.",
+                            "Strips script and style content, inline handlers and javascript: URLs from extracted text.",
                         )
                         .size(10.5)
                         .color(Color32::from_rgb(112, 123, 146)),
@@ -1009,36 +1000,40 @@ impl RustRequestApp {
                             }
                         });
                     ui.add_space(4.0);
-                    ui.label(RichText::new("Output file").size(12.0).color(MUTED));
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.form.output)
-                            .desired_width(f32::INFINITY)
-                            .hint_text(format!(
-                                "rustrequest-output.{}",
-                                self.form.format.extension()
-                            )),
-                    );
-                    ui.add_space(4.0);
+                    ui.label(RichText::new("Output directory").size(12.0).color(MUTED));
+                    ui.horizontal(|ui| {
+                        let button_w = 86.0;
+                        let field_w = (ui.available_width()
+                            - button_w
+                            - ui.spacing().item_spacing.x)
+                            .max(120.0);
+                        ui.add_sized(
+                            [field_w, 22.0],
+                            egui::TextEdit::singleline(&mut self.form.output_dir)
+                                .hint_text("current directory"),
+                        );
+                        if ui
+                            .add_sized([button_w, 22.0], egui::Button::new("Browse…"))
+                            .clicked()
+                            && let Some(dir) = rfd::FileDialog::new()
+                                .set_title("Choose output directory")
+                                .pick_folder()
+                        {
+                            self.form.output_dir = dir.display().to_string();
+                        }
+                    });
                     ui.label(
-                        RichText::new("Save HTML snapshots to directory (optional)")
-                            .size(12.0)
-                            .color(MUTED),
-                    );
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.form.save_html)
-                            .desired_width(f32::INFINITY)
-                            .hint_text("./scraped-html"),
-                    );
-                    if non_empty(&self.form.save_html).is_some() {
-                        ui.label(
-                            RichText::new(format!(
-                                "HTML files go here; extracted data is written separately to {}.",
-                                self.output_preview()
-                            ))
+                        RichText::new(format!("Output file: {}", self.output_preview()))
                             .size(10.5)
                             .color(Color32::from_rgb(112, 123, 146)),
-                        );
-                    }
+                    );
+                    ui.label(
+                        RichText::new(
+                            "The file name is chosen automatically from the output format.",
+                        )
+                        .size(10.0)
+                        .color(Color32::from_rgb(100, 110, 132)),
+                    );
                 });
 
                 if let Some(err) = &self.config_error {

@@ -90,7 +90,7 @@ pub struct Cli {
     #[arg(long, conflicts_with = "respect_robots")]
     pub ignore_robots: bool,
 
-    /// Keep JavaScript instead of stripping it from saved/extracted HTML
+    /// Keep script and style content when extracting readable text
     #[arg(long)]
     pub keep_js: bool,
 
@@ -109,10 +109,6 @@ pub struct Cli {
     /// Output file path (defaults to rustrequest-output.<ext>)
     #[arg(short = 'o', long)]
     pub output: Option<PathBuf>,
-
-    /// Save fetched HTML into this directory
-    #[arg(long = "save-html", value_name = "DIR")]
-    pub save_html: Option<PathBuf>,
 
     /// Fetch seed URLs only; do not follow links
     #[arg(long)]
