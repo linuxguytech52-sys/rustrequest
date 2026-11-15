@@ -167,6 +167,18 @@ JSON page objects include:
 
 The `text` field is omitted when text extraction is disabled or no text is available.
 
+### HTML snapshots
+
+`--save-html <DIR>` (or "Save HTML snapshots to directory" in the GUI) expects a **directory** and saves one `.html` file per fetched page into it. This happens **in addition to** the normal data export, which is still written to the `--output` path (default `rustrequest-output.<ext>` in the current directory). HTML snapshots are never written to the output file, and the output file is never written into the HTML directory unless you explicitly point both settings at the same path.
+
+```bash
+# Data export: rustrequest-output.json
+# HTML snapshots: ./snapshots/*.html
+rustrequest https://example.com -f json --save-html ./snapshots
+```
+
+If you open the HTML directory and see only `.html` files, look for the data export at the `Output file` path shown in the GUI, or at the `results →` path printed in headless mode.
+
 ## JavaScript handling
 
 Pages are always analyzed for JavaScript usage. By default, scripts, inline event handlers, `javascript:` URLs, and related markup are removed from saved HTML and extracted text. Use `--keep-js` to preserve them.

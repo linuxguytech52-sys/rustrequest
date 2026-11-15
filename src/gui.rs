@@ -246,6 +246,29 @@ impl RustRequestApp {
         let output = non_empty(&self.form.output).map(PathBuf::from);
         let save_html = non_empty(&self.form.save_html).map(PathBuf::from);
 
+        if let Some(path) = &output
+            && path.is_dir()
+        {
+            anyhow::bail!(
+                "output file '{}' is a directory; enter a file path instead (default: rustrequest-output.{})",
+                path.display(),
+                self.form.format.extension()
+            );
+        }
+        if let Some(path) = &save_html {
+            if path.exists() && !path.is_dir() {
+                anyhow::bail!(
+                    "save-HTML path '{}' is a file; enter a directory instead",
+                    path.display()
+                );
+            }
+            if let Some(output) = &output
+                && output == path
+            {
+                anyhow::bail!("output file and save-HTML directory must be different paths");
+            }
+        }
+
         let fetch_only = self.tab == Tab::Scrape;
         let max_depth = if fetch_only { 0 } else { self.form.depth };
         let max_pages = if fetch_only {
@@ -307,6 +330,11 @@ impl RustRequestApp {
             .lines()
             .filter(|line| !line.trim().is_empty())
             .count()
+    }
+
+    fn output_preview(&self) -> String {
+        non_empty(&self.form.output)
+            .unwrap_or_else(|| format!("rustrequest-output.{}", self.form.format.extension()))
     }
 
     fn planned_pages(&self) -> usize {
@@ -985,15 +1013,32 @@ impl RustRequestApp {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.form.output)
                             .desired_width(f32::INFINITY)
-                            .hint_text("rustrequest-output.json"),
+                            .hint_text(format!(
+                                "rustrequest-output.{}",
+                                self.form.format.extension()
+                            )),
                     );
                     ui.add_space(4.0);
-                    ui.label(RichText::new("Save HTML to directory").size(12.0).color(MUTED));
+                    ui.label(
+                        RichText::new("Save HTML snapshots to directory (optional)")
+                            .size(12.0)
+                            .color(MUTED),
+                    );
                     ui.add(
                         egui::TextEdit::singleline(&mut self.form.save_html)
                             .desired_width(f32::INFINITY)
                             .hint_text("./scraped-html"),
                     );
+                    if non_empty(&self.form.save_html).is_some() {
+                        ui.label(
+                            RichText::new(format!(
+                                "HTML files go here; extracted data is written separately to {}.",
+                                self.output_preview()
+                            ))
+                            .size(10.5)
+                            .color(Color32::from_rgb(112, 123, 146)),
+                        );
+                    }
                 });
 
                 if let Some(err) = &self.config_error {
