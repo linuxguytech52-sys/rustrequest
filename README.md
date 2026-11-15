@@ -7,6 +7,7 @@ A fast web scraper and crawler written in Rust, with a graphical desktop UI, an 
 - Three frontends: native GUI, animated TUI, and headless CLI output
 - Two GUI tabs: **Scrape** (fetch each URL once) and **Crawl** (follow links in BFS order)
 - Concurrent fetching with configurable workers, depth, page limits, and URL exclusions
+- Global request-rate limiting and hard caps to keep crawls polite
 - JavaScript analysis: inline and external scripts, event handlers, `javascript:` URLs, `<noscript>`, and framework hints (React, Next.js, Vue)
 - Optional JavaScript removal from extracted text
 - `robots.txt` support, including wildcard rules and `Crawl-delay` (enabled by default)
@@ -42,6 +43,9 @@ rustrequest https://example.com
 
 # Crawl up to 100 pages, two levels deep, through a proxy
 rustrequest https://example.com -d 2 -m 100 -p socks5://127.0.0.1:1080
+
+# Write rustrequest-output.json into a specific directory
+rustrequest https://example.com --output-dir ./reports
 
 # Scrape a fixed list of URLs without following links
 rustrequest https://example.com https://example.com/about --fetch
@@ -82,7 +86,8 @@ In the GUI, `Ctrl+Enter` starts or stops the current scrape or crawl.
 | --- | --- |
 | `-d, --depth <N>` | Maximum crawl depth (`0` = seed pages only) |
 | `-m, --max-pages <N>` | Maximum number of pages to fetch |
-| `-c, --concurrency <N>` | Number of concurrent requests |
+| `-c, --concurrency <N>` | Number of concurrent requests (capped at 32) |
+| `--max-rps <N>` | Maximum HTTP requests per second across the crawl (1-100, default 10) |
 | `--any-domain` | Allow crawling across different domains |
 | `--include-subdomains` | Include subdomains of the seed host |
 | `-p, --proxy <URL>` | Proxy URL (`http`, `https`, or `socks5`); credentials may be embedded (`http://user:pass@host:port`) |
@@ -97,13 +102,30 @@ In the GUI, `Ctrl+Enter` starts or stops the current scrape or crawl.
 | `--no-text` | Do not extract readable page text |
 | `--insecure` | Accept invalid TLS certificates |
 | `-f, --format <FORMAT>` | `json`, `jsonl`, `csv`, `sitemap`, or `text` |
-| `-o, --output <PATH>` | Output file path (defaults to `rustrequest-output.<ext>`) |
+| `-o, --output <PATH>` | Output file path, or a directory to write `rustrequest-output.<ext>` into |
+| `--output-dir <DIR>` | Directory where `rustrequest-output.<ext>` will be written |
 | `--fetch` | Fetch seed URLs only; do not follow links |
 | `--max-links <N>` | Limit extracted links per page |
 | `--exclude <SUBSTRING>` | Skip URLs containing a substring, repeatable |
 | `-v, --verbose` | Print extra diagnostics |
 
 Run `rustrequest --help` for the full list.
+
+## Rate limits and politeness
+
+Crawls are intentionally capped so the tool cannot be pointed at a site with unbounded concurrency or page volume:
+
+| Limit | Cap | Default |
+| --- | --- | --- |
+| Concurrent requests | 32 | 8 |
+| Requests per second (global) | 100 | 10 |
+| Maximum pages | 10,000 | 50 |
+| Crawl depth | 10 | 2 |
+| Retries per request | 5 | 2 |
+
+`--max-rps` applies a global token interval across the entire crawl, so even with higher concurrency the average request rate stays at or below the configured value. Use `--delay` to add an additional pause between requests, and keep `robots.txt` enabled (the default) to honor site rules and `Crawl-delay`.
+
+Please only crawl sites you are authorized to access, and keep the rate low enough that the target site is not disrupted.
 
 ## Proxy authentication
 
@@ -170,10 +192,12 @@ The `text` field is omitted when text extraction is disabled or no text is avail
 
 In the GUI, set **Output directory** to the folder where results should be written, or click **Browse…** to pick it. The file name is derived from the selected format (`rustrequest-output.json`, `.csv`, `.xml`, and so on). Leave the directory empty to write into the current working directory.
 
-On the command line, `-o, --output` takes the full file path:
+On the command line, `--output-dir` writes the automatically named file into a directory, while `-o, --output` accepts either a full file path or a directory:
 
 ```bash
+rustrequest https://example.com -f csv --output-dir ./reports
 rustrequest https://example.com -f csv -o ./reports/site.csv
+rustrequest https://example.com -f csv -o ./reports
 ```
 
 ## JavaScript handling

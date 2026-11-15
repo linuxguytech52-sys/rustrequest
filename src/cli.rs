@@ -42,9 +42,13 @@ pub struct Cli {
     #[arg(short = 'm', long = "max-pages", default_value_t = 50)]
     pub max_pages: usize,
 
-    /// Number of concurrent requests
+    /// Number of concurrent requests (capped at 32)
     #[arg(short = 'c', long, default_value_t = 8)]
     pub concurrency: usize,
+
+    /// Maximum HTTP requests per second across the whole crawl (1-100)
+    #[arg(long = "max-rps", default_value_t = 10)]
+    pub max_rps: u32,
 
     /// Allow crawling across different domains
     #[arg(long)]
@@ -66,7 +70,7 @@ pub struct Cli {
     #[arg(long, default_value_t = 0)]
     pub delay: u64,
 
-    /// Number of retries for failed requests
+    /// Number of retries for failed requests (capped at 5)
     #[arg(long, default_value_t = 2)]
     pub retries: u32,
 
@@ -106,9 +110,13 @@ pub struct Cli {
     #[arg(short = 'f', long, value_enum, default_value_t = OutputFormat::Json)]
     pub format: OutputFormat,
 
-    /// Output file path (defaults to rustrequest-output.<ext>)
-    #[arg(short = 'o', long)]
+    /// Output file path, or a directory to write rustrequest-output.<ext> into
+    #[arg(short = 'o', long, conflicts_with = "output_dir")]
     pub output: Option<PathBuf>,
+
+    /// Directory where rustrequest-output.<ext> will be written
+    #[arg(long = "output-dir", value_name = "DIR", conflicts_with = "output")]
+    pub output_dir: Option<PathBuf>,
 
     /// Fetch seed URLs only; do not follow links
     #[arg(long)]

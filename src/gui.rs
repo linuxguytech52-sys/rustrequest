@@ -89,6 +89,7 @@ struct Form {
     depth: usize,
     max_pages: usize,
     concurrency: usize,
+    max_rps: u32,
     proxy: String,
     timeout: u64,
     delay: u64,
@@ -119,6 +120,7 @@ impl Form {
             depth: cfg.max_depth,
             max_pages: cfg.max_pages,
             concurrency: cfg.concurrency,
+            max_rps: cfg.max_rps,
             proxy: cfg.proxy.clone().unwrap_or_default(),
             timeout: cfg.timeout.as_secs(),
             delay: cfg.delay.as_millis() as u64,
@@ -257,24 +259,29 @@ impl RustRequestApp {
         });
 
         let fetch_only = self.tab == Tab::Scrape;
-        let max_depth = if fetch_only { 0 } else { self.form.depth };
-        let max_pages = if fetch_only {
-            seeds.len()
+        let max_depth = if fetch_only {
+            0
         } else {
-            self.form.max_pages.max(1)
+            self.form.depth.min(10)
+        };
+        let max_pages = if fetch_only {
+            seeds.len().min(10_000)
+        } else {
+            self.form.max_pages.clamp(1, 10_000)
         };
 
         Ok(Config {
             seeds,
             max_depth,
             max_pages,
-            concurrency: self.form.concurrency.max(1),
+            concurrency: self.form.concurrency.clamp(1, 32),
+            max_rps: self.form.max_rps.clamp(1, 100),
             same_domain: self.form.same_domain,
             include_subdomains: self.form.include_subdomains,
             proxy: non_empty(&self.form.proxy),
             timeout: Duration::from_secs(self.form.timeout.max(1)),
             delay: Duration::from_millis(self.form.delay),
-            retries: self.form.retries,
+            retries: self.form.retries.min(5),
             user_agent: self.form.user_agent.clone(),
             headers,
             respect_robots: self.form.respect_robots,
@@ -822,6 +829,7 @@ impl RustRequestApp {
                         max_depth: 2,
                         max_pages: 50,
                         concurrency: 8,
+                        max_rps: 10,
                         same_domain: true,
                         include_subdomains: false,
                         proxy: None,
@@ -886,11 +894,11 @@ impl RustRequestApp {
                             .color(Color32::from_rgb(112, 123, 146)),
                         );
                         ui.add_space(2.0);
-                        drag_usize(ui, "Concurrency", &mut self.form.concurrency, 1..=64, "");
+                        drag_usize(ui, "Concurrency", &mut self.form.concurrency, 1..=32, "");
                     } else {
                         drag_usize(ui, "Depth", &mut self.form.depth, 0..=10, "");
-                        drag_usize(ui, "Max pages", &mut self.form.max_pages, 1..=100_000, "");
-                        drag_usize(ui, "Concurrency", &mut self.form.concurrency, 1..=64, "");
+                        drag_usize(ui, "Max pages", &mut self.form.max_pages, 1..=10_000, "");
+                        drag_usize(ui, "Concurrency", &mut self.form.concurrency, 1..=32, "");
                         ui.add_space(2.0);
                         ui.checkbox(
                             &mut self.form.same_domain,
@@ -917,7 +925,14 @@ impl RustRequestApp {
                     ui.add_space(4.0);
                     drag_u64(ui, "Timeout (s)", &mut self.form.timeout, 1..=300, "");
                     drag_u64(ui, "Delay (ms)", &mut self.form.delay, 0..=60_000, "");
-                    drag_u32(ui, "Retries", &mut self.form.retries, 0..=10, "");
+                    drag_u32(ui, "Retries", &mut self.form.retries, 0..=5, "");
+                    drag_u32(
+                        ui,
+                        "Max requests / sec",
+                        &mut self.form.max_rps,
+                        1..=100,
+                        "",
+                    );
                     ui.add_space(4.0);
                     ui.label(RichText::new("User-Agent").size(12.0).color(MUTED));
                     ui.add(

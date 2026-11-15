@@ -61,11 +61,13 @@ pub async fn run(cfg: Config) -> Result<()> {
                 );
                 println!("{} {}", paint("90", "seed"), seeds.join(", "));
                 println!(
-                    "{} mode={} depth={} max={} proxy={} robots={}",
+                    "{} mode={} depth={} max={} concurrency={} rps={} proxy={} robots={}",
                     paint("90", "config"),
                     if cfg.fetch_only { "fetch" } else { "crawl" },
                     max_depth,
                     max_pages,
+                    cfg.concurrency,
+                    cfg.max_rps,
                     proxy.as_deref().unwrap_or("none"),
                     if respect_robots { "on" } else { "off" }
                 );

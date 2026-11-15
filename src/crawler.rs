@@ -95,6 +95,8 @@ pub async fn crawl_with_cancel(
 ) -> CrawlResult {
     let started = Instant::now();
     let robots = RobotsCache::new(client.clone(), cfg.user_agent.clone(), cfg.respect_robots);
+    let interval = Duration::from_secs_f64(1.0 / cfg.max_rps.max(1) as f64);
+    let next_slot = Arc::new(tokio::sync::Mutex::new(Instant::now()));
 
     let _ = tx.send(CrawlEvent::Started {
         seeds: cfg.seeds.iter().map(|u| u.to_string()).collect(),
@@ -152,7 +154,18 @@ pub async fn crawl_with_cancel(
 
         let fetches = stream::iter(level).map(|(url, depth)| {
             let client = client_ref.clone();
+            let limiter = Arc::clone(&next_slot);
             async move {
+                let mut slot = limiter.lock().await;
+                let now = Instant::now();
+                let start_at = (*slot).max(now);
+                *slot = start_at + interval;
+                drop(slot);
+                let wait = start_at.saturating_duration_since(now);
+                if !wait.is_zero() {
+                    tokio::time::sleep(wait).await;
+                }
+
                 let mut delay = cfg_ref.delay;
                 if cfg_ref.respect_robots {
                     if !robots_ref.allowed(&url).await {

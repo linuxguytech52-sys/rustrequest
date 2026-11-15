@@ -11,6 +11,7 @@ pub struct Config {
     pub max_depth: usize,
     pub max_pages: usize,
     pub concurrency: usize,
+    pub max_rps: u32,
     pub same_domain: bool,
     pub include_subdomains: bool,
     pub proxy: Option<String>,
@@ -78,11 +79,22 @@ impl Config {
         }
 
         let fetch_only = cli.fetch;
-        let max_depth = if fetch_only { 0 } else { cli.depth };
+        let max_depth = if fetch_only { 0 } else { cli.depth.min(10) };
         let max_pages = if fetch_only {
-            seeds.len()
+            seeds.len().min(10_000)
         } else {
-            cli.max_pages.max(1)
+            cli.max_pages.clamp(1, 10_000)
+        };
+        let output = if let Some(dir) = cli.output_dir {
+            Some(dir.join(format!("rustrequest-output.{}", cli.format.extension())))
+        } else if let Some(path) = cli.output {
+            if path.is_dir() {
+                Some(path.join(format!("rustrequest-output.{}", cli.format.extension())))
+            } else {
+                Some(path)
+            }
+        } else {
+            None
         };
 
         let (gui, tui) = if cli.gui {
@@ -103,13 +115,14 @@ impl Config {
             seeds,
             max_depth,
             max_pages,
-            concurrency: cli.concurrency.max(1),
+            concurrency: cli.concurrency.clamp(1, 32),
+            max_rps: cli.max_rps.clamp(1, 100),
             same_domain: !cli.any_domain,
             include_subdomains: cli.include_subdomains,
             proxy: cli.proxy,
             timeout: Duration::from_secs(cli.timeout.max(1)),
             delay: Duration::from_millis(cli.delay),
-            retries: cli.retries,
+            retries: cli.retries.min(5),
             user_agent: cli.user_agent,
             headers,
             respect_robots: !cli.ignore_robots,
@@ -118,7 +131,7 @@ impl Config {
             insecure: cli.insecure,
             fetch_only,
             format: cli.format,
-            output: cli.output,
+            output,
             verbose: cli.verbose,
             max_links: cli.max_links,
             exclude: cli.exclude,
